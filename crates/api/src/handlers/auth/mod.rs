@@ -13,7 +13,7 @@ use crate::error::ApiError;
 use crate::middleware::auth::AuthenticatedUser;
 use crate::services::jwt::{JwtService, RefreshSession};
 use crate::services::metrics::MetricsExtension;
-use crate::services::otp::OtpService;
+use crate::services::otp::{OtpService, OtpVerifyResult};
 use domain::user::entity::User;
 use domain::user::repository::UserRepository;
 use domain::user::value_objects::{PhoneNumber, UserId};
@@ -273,20 +273,45 @@ pub async fn verify_phone(
     State(state): State<AuthState>,
     Json(req): Json<VerifyPhoneRequest>,
 ) -> Result<Response, ApiError> {
-    let valid = state
+    let result = state
         .otp_service
         .verify_register_otp(&req.phone, &req.code)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-    if !valid {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(MessageResponse {
-                message: "Código inválido".to_string(),
-            }),
-        )
-            .into_response());
+    match result {
+        OtpVerifyResult::Matched => {}
+        OtpVerifyResult::Invalid { remaining } => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: format!(
+                        "Código inválido. Intentos restantes: {}",
+                        remaining
+                    ),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::Exceeded => {
+            return Ok((
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MessageResponse {
+                    message: "Demasiados intentos fallidos. Por favor solicita un nuevo código."
+                        .to_string(),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::NotFound => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: "El código ha expirado. Por favor solicita uno nuevo.".to_string(),
+                }),
+            )
+                .into_response());
+        }
     }
 
     let phone =
@@ -365,20 +390,45 @@ pub async fn login_verify(
     State(state): State<AuthState>,
     Json(req): Json<LoginVerifyRequest>,
 ) -> Result<Response, ApiError> {
-    let valid = state
+    let result = state
         .otp_service
         .verify_login_otp(&req.phone, &req.code)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-    if !valid {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(MessageResponse {
-                message: "Código inválido".to_string(),
-            }),
-        )
-            .into_response());
+    match result {
+        OtpVerifyResult::Matched => {}
+        OtpVerifyResult::Invalid { remaining } => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: format!(
+                        "Código inválido. Intentos restantes: {}",
+                        remaining
+                    ),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::Exceeded => {
+            return Ok((
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MessageResponse {
+                    message: "Demasiados intentos fallidos. Por favor solicita un nuevo código."
+                        .to_string(),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::NotFound => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: "El código ha expirado. Por favor solicita uno nuevo.".to_string(),
+                }),
+            )
+                .into_response());
+        }
     }
 
     let phone =
@@ -475,19 +525,45 @@ pub async fn recover_verify(
     State(state): State<AuthState>,
     Json(req): Json<RecoverVerifyRequest>,
 ) -> Result<Response, ApiError> {
-    let valid = state
+    let result = state
         .otp_service
         .verify_recover_otp(&req.phone, &req.code)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
-    if !valid {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(MessageResponse {
-                message: "Codigo invalido".to_string(),
-            }),
-        )
-            .into_response());
+
+    match result {
+        OtpVerifyResult::Matched => {}
+        OtpVerifyResult::Invalid { remaining } => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: format!(
+                        "Código inválido. Intentos restantes: {}",
+                        remaining
+                    ),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::Exceeded => {
+            return Ok((
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MessageResponse {
+                    message: "Demasiados intentos fallidos. Por favor solicita un nuevo código."
+                        .to_string(),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::NotFound => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: "El código ha expirado. Por favor solicita uno nuevo.".to_string(),
+                }),
+            )
+                .into_response());
+        }
     }
 
     let phone =
@@ -532,19 +608,45 @@ pub async fn two_fa_setup_verify(
     Extension(auth): Extension<AuthenticatedUser>,
     Json(req): Json<TwoFactorSetupRequest>,
 ) -> Result<Response, ApiError> {
-    let valid = state
+    let result = state
         .otp_service
         .verify_two_fa_setup_otp(&auth.user_id.to_string(), &req.code)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
-    if !valid {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(MessageResponse {
-                message: "Codigo de configuracion invalido".to_string(),
-            }),
-        )
-            .into_response());
+
+    match result {
+        OtpVerifyResult::Matched => {}
+        OtpVerifyResult::Invalid { remaining } => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: format!(
+                        "Código de configuración inválido. Intentos restantes: {}",
+                        remaining
+                    ),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::Exceeded => {
+            return Ok((
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MessageResponse {
+                    message: "Demasiados intentos fallidos. Por favor inicia la configuración de 2FA nuevamente."
+                        .to_string(),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::NotFound => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: "El código ha expirado. Por favor inicia la configuración de 2FA nuevamente.".to_string(),
+                }),
+            )
+                .into_response());
+        }
     }
 
     let mut user = state
@@ -578,19 +680,45 @@ pub async fn two_fa_verify(
 
     let user_id =
         Uuid::parse_str(&claims.sub).map_err(|e| DomainError::Unauthorized(e.to_string()))?;
-    let valid = state
+    let result = state
         .otp_service
         .verify_two_fa_login_otp(&user_id.to_string(), &req.code)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
-    if !valid {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            Json(MessageResponse {
-                message: "Codigo 2FA invalido".to_string(),
-            }),
-        )
-            .into_response());
+
+    match result {
+        OtpVerifyResult::Matched => {}
+        OtpVerifyResult::Invalid { remaining } => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: format!(
+                        "Código 2FA inválido. Intentos restantes: {}",
+                        remaining
+                    ),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::Exceeded => {
+            return Ok((
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MessageResponse {
+                    message: "Demasiados intentos fallidos. Por favor solicita un nuevo código."
+                        .to_string(),
+                }),
+            )
+                .into_response());
+        }
+        OtpVerifyResult::NotFound => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: "El código ha expirado. Por favor solicita uno nuevo.".to_string(),
+                }),
+            )
+                .into_response());
+        }
     }
 
     let user = state
