@@ -1,12 +1,12 @@
 use crate::services::metrics::MetricsExtension;
 use axum::{
+    Json,
     extract::{
         Extension, Query, State,
         ws::{WebSocket, WebSocketUpgrade},
     },
-    response::IntoResponse,
-    Json,
     http::StatusCode,
+    response::IntoResponse,
 };
 use chrono::{DateTime, Utc};
 use domain::user::repository::UserRepository;
@@ -20,8 +20,8 @@ use uuid::Uuid;
 use super::WsState;
 use super::dto::{WsClientMessage, WsParams};
 use crate::error::ApiError;
-use crate::routes::WsRouterState;
 use crate::middleware::auth::AuthenticatedUser;
+use crate::routes::WsRouterState;
 use redis::AsyncCommands;
 use shared::error::DomainError;
 
@@ -35,17 +35,17 @@ pub async fn create_ws_ticket(
     let mut redis = state.ws_state.redis.clone();
 
     // Store the ticket in Redis mapping to the user ID with a 30 seconds TTL
-    let _: () = redis.set_ex(&redis_key, auth_user.user_id.to_string(), 30_u64)
+    let _: () = redis
+        .set_ex(&redis_key, auth_user.user_id.to_string(), 30_u64)
         .await
         .map_err(|e| {
             tracing::error!("Failed to store WS ticket in Redis: {:?}", e);
-            ApiError(DomainError::Internal("Database connection error".to_string()))
+            ApiError(DomainError::Internal(
+                "Database connection error".to_string(),
+            ))
         })?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(json!({ "ticket": ticket })),
-    ))
+    Ok((StatusCode::CREATED, Json(json!({ "ticket": ticket }))))
 }
 
 pub async fn ws_handler(

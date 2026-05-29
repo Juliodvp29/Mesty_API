@@ -285,10 +285,7 @@ pub async fn verify_phone(
             return Ok((
                 StatusCode::BAD_REQUEST,
                 Json(MessageResponse {
-                    message: format!(
-                        "Código inválido. Intentos restantes: {}",
-                        remaining
-                    ),
+                    message: format!("Código inválido. Intentos restantes: {}", remaining),
                 }),
             )
                 .into_response());
@@ -402,10 +399,7 @@ pub async fn login_verify(
             return Ok((
                 StatusCode::BAD_REQUEST,
                 Json(MessageResponse {
-                    message: format!(
-                        "Código inválido. Intentos restantes: {}",
-                        remaining
-                    ),
+                    message: format!("Código inválido. Intentos restantes: {}", remaining),
                 }),
             )
                 .into_response());
@@ -537,10 +531,7 @@ pub async fn recover_verify(
             return Ok((
                 StatusCode::BAD_REQUEST,
                 Json(MessageResponse {
-                    message: format!(
-                        "Código inválido. Intentos restantes: {}",
-                        remaining
-                    ),
+                    message: format!("Código inválido. Intentos restantes: {}", remaining),
                 }),
             )
                 .into_response());
@@ -692,10 +683,7 @@ pub async fn two_fa_verify(
             return Ok((
                 StatusCode::BAD_REQUEST,
                 Json(MessageResponse {
-                    message: format!(
-                        "Código 2FA inválido. Intentos restantes: {}",
-                        remaining
-                    ),
+                    message: format!("Código 2FA inválido. Intentos restantes: {}", remaining),
                 }),
             )
                 .into_response());

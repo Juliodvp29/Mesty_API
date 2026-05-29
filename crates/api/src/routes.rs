@@ -313,7 +313,10 @@ pub fn create_router(
         .with_state(blocks_state);
 
     let ws_ticket_route = Router::new()
-        .route("/ws/ticket", post(crate::handlers::ws::handlers::create_ws_ticket))
+        .route(
+            "/ws/ticket",
+            post(crate::handlers::ws::handlers::create_ws_ticket),
+        )
         .route_layer(middleware::from_fn_with_state(
             auth_middleware_state.clone(),
             auth_middleware,

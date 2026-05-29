@@ -29,8 +29,8 @@ use crate::handlers::chats::dto::{
 use crate::middleware::auth::AuthenticatedUser;
 use crate::services::metrics::MetricsExtension;
 use crate::services::push::{PRESENCE_KEY_PREFIX, PushNotificationJob, enqueue_push_notification};
-use infrastructure::repositories::chat::PostgresChatRepository;
 use crate::services::rate_limit::check_rate_limit;
+use infrastructure::repositories::chat::PostgresChatRepository;
 
 #[derive(Clone)]
 pub struct ChatsState {

@@ -304,9 +304,15 @@ curl "http://localhost:3000/chats/{chat_id}/messages?cursor={cursor}&direction=b
 
 ### Real-Time (WebSocket)
 
-| Method | Endpoint          | Description          | Auth              |
-| ------ | ----------------- | -------------------- | ----------------- |
-| `GET`  | `/ws?token={jwt}` | Upgrade to WebSocket | JWT (query param) |
+To avoid JWT token exposure in server logs, reverse proxies, and browser history, Mesty implements a **One-Time Ticket** authentication flow for WebSockets:
+
+1. **Request Ticket:** Send an authenticated `POST` request to `/ws/ticket` with the standard `Authorization: Bearer <JWT>` header. The server returns `{"ticket": "<UUID_TICKET>"}` (expires in 30 seconds, single-use).
+2. **Establish Connection:** Connect to `/ws?ticket=<UUID_TICKET>` via the WebSocket protocol. The ticket is immediately validated and consumed upon connection.
+
+| Method | Endpoint             | Description                     | Auth                        |
+| ------ | -------------------- | ------------------------------- | --------------------------- |
+| `POST` | `/ws/ticket`         | Generate temporary one-time ticket | Bearer (JWT)                |
+| `GET`  | `/ws?ticket={ticket}`| Upgrade to WebSocket connection  | One-time ticket (query param)|
 
 **Server → Client Events:**
 
@@ -465,15 +471,17 @@ Redis serves 7 distinct roles in the system:
 | 6   | `push:queue`            | Push notification job queue       | —      |
 | 7   | `refresh:{hash}`        | Refresh token rotation tracking   | 7 days |
 
-### Rate Limits
+### Rate Limits & Security Policies
 
-| Endpoint                        | Limit   | Window |
-| ------------------------------- | ------- | ------ |
-| `/auth/login`, `/auth/register` | 10 req  | 60s    |
-| `/users/search`                 | 30 req  | 60s    |
-| Message sending                 | 100 req | 60s    |
-| File uploads                    | 20 req  | 60s    |
-| General API                     | 300 req | 60s    |
+| Category / Endpoint              | Limit              | Window | Action on Exceeding              |
+| -------------------------------- | ------------------ | ------ | -------------------------------- |
+| `/auth/login`, `/auth/register`  | 10 req            | 60s    | `429 Too Many Requests`          |
+| OTP Verification (all endpoints) | 3 failed attempts  | —      | Invalidates OTP + `429` Response |
+| `/users/search`                  | 30 req            | 60s    | `429 Too Many Requests`          |
+| Message sending                  | 15 req            | 10s    | `429 Too Many Requests`          |
+| File uploads                     | 20 req            | 60s    | `429 Too Many Requests`          |
+| Concurrent WebSocket connections | 5 active conns     | —      | `409 Conflict` (refuses upgrade) |
+| General API                      | 300 req           | 60s    | `429 Too Many Requests`          |
 
 Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After` (on 429).
 
