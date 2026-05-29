@@ -95,7 +95,7 @@ impl CallRepository for PostgresCallRepository {
         .bind(call_type_str)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("DB error creating call: {}", e)))?;
+        .map_err(DomainError::from_sqlx)?;
 
         row.try_into()
     }
@@ -110,7 +110,7 @@ impl CallRepository for PostgresCallRepository {
         .bind(call_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("DB error fetching call: {}", e)))?;
+        .map_err(DomainError::from_sqlx)?;
 
         row.map(Call::try_from).transpose()
     }
@@ -142,7 +142,7 @@ impl CallRepository for PostgresCallRepository {
         .bind(ended_at)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("DB error updating call status: {}", e)))?;
+        .map_err(DomainError::from_sqlx)?;
 
         row.try_into()
     }
@@ -160,7 +160,7 @@ impl CallRepository for PostgresCallRepository {
         .bind(user_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("DB error checking active call: {}", e)))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(exists)
     }

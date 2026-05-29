@@ -22,3 +22,5 @@ validator.workspace = true
 sha2.workspace = true
 hex.workspace = true
 dotenvy.workspace = true
+sqlx.workspace = true
+

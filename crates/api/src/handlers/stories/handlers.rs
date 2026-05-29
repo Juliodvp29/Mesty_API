@@ -50,7 +50,7 @@ pub async fn create_story(
             req.privacy.clone(),
         )
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     if let Some(exceptions) = req.exceptions {
         for user_id in exceptions {
@@ -59,7 +59,7 @@ pub async fn create_story(
                 .story_repo
                 .add_privacy_exception(story.id, user_id, is_excluded)
                 .await
-                .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+                .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
         }
     }
 
@@ -78,7 +78,7 @@ pub async fn list_stories(
         .story_repo
         .list_for_user(auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     // Group stories by user_id preserving the query order (unseen first).
     let mut grouped: Vec<GroupedStoriesResponse> = Vec::new();
@@ -122,7 +122,7 @@ pub async fn list_my_stories(
         .story_repo
         .list_my_stories(auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     let response: Vec<StoryWithUserResponse> = stories
         .into_iter()
@@ -154,7 +154,7 @@ pub async fn delete_story(
         .story_repo
         .find_by_id(story_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?
         .ok_or_else(|| ApiError(DomainError::NotFound("Story not found".to_string())))?;
 
     if story.user_id != auth.user_id {
@@ -167,7 +167,7 @@ pub async fn delete_story(
         .story_repo
         .delete(story_id, auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     Ok(Json(()))
 }
@@ -183,7 +183,7 @@ pub async fn view_story(
         .story_repo
         .find_by_id(story_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?
         .ok_or_else(|| ApiError(DomainError::NotFound("Story not found".to_string())))?;
 
     if story.user_id == auth.user_id {
@@ -196,7 +196,7 @@ pub async fn view_story(
         .story_repo
         .can_user_view_story(story_id, auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     if !can_view {
         return Err(ApiError(DomainError::Unauthorized(
@@ -208,7 +208,7 @@ pub async fn view_story(
         .story_repo
         .mark_viewed(story_id, auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     let notification = NewNotification {
         user_id: story.user_id,
@@ -257,7 +257,7 @@ pub async fn react_to_story(
         .story_repo
         .find_by_id(story_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?
         .ok_or_else(|| ApiError(DomainError::NotFound("Story not found".to_string())))?;
 
     if story.user_id == auth.user_id {
@@ -270,7 +270,7 @@ pub async fn react_to_story(
         .story_repo
         .can_user_view_story(story_id, auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     if !can_view {
         return Err(ApiError(DomainError::Unauthorized(
@@ -282,7 +282,7 @@ pub async fn react_to_story(
         .story_repo
         .has_viewed(story_id, auth.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     if !has_viewed {
         return Err(ApiError(DomainError::Validation(
@@ -294,7 +294,7 @@ pub async fn react_to_story(
         .story_repo
         .add_reaction(story_id, auth.user_id, req.reaction.clone())
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     let notification = NewNotification {
         user_id: story.user_id,
@@ -342,7 +342,7 @@ pub async fn get_story_views(
         .story_repo
         .find_by_id(story_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?
         .ok_or_else(|| ApiError(DomainError::NotFound("Story not found".to_string())))?;
 
     if story.user_id != auth.user_id {
@@ -355,7 +355,7 @@ pub async fn get_story_views(
         .story_repo
         .get_views_with_user(story_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        .map_err(|e| ApiError(DomainError::from_boxed_err(e)))?;
 
     let response: Vec<StoryViewResponse> = views
         .into_iter()

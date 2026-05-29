@@ -47,7 +47,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -71,7 +71,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_contact).transpose()
     }
@@ -100,7 +100,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_contact).transpose()
     }
@@ -125,7 +125,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         records.into_iter().map(map_record_to_contact).collect()
     }
@@ -150,7 +150,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         records.into_iter().map(map_record_to_contact).collect()
     }
@@ -173,7 +173,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -187,7 +187,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -201,7 +201,7 @@ impl ContactRepository for PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -272,7 +272,7 @@ impl PostgresContactRepository {
             .bind(&existing_hashes)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
         Ok(records)
     }
@@ -305,7 +305,7 @@ impl PostgresContactRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record
             .map(|rec| {
@@ -348,7 +348,7 @@ impl PostgresContactRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         records.into_iter().map(map_record_to_contact).collect()
     }
@@ -377,7 +377,7 @@ impl PostgresContactRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_contact).transpose()
     }
@@ -401,7 +401,7 @@ impl PostgresContactRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_contact).transpose()
     }
@@ -422,7 +422,7 @@ impl PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -445,7 +445,7 @@ impl PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -459,7 +459,7 @@ impl PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -488,7 +488,7 @@ impl PostgresContactRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
