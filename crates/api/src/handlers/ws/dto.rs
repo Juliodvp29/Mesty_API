@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WsParams {
-    pub token: String,
+    pub ticket: String,
 }
 
 // ============================================================

@@ -5,6 +5,8 @@ use axum::{
         ws::{WebSocket, WebSocketUpgrade},
     },
     response::IntoResponse,
+    Json,
+    http::StatusCode,
 };
 use chrono::{DateTime, Utc};
 use domain::user::repository::UserRepository;
@@ -19,7 +21,32 @@ use super::WsState;
 use super::dto::{WsClientMessage, WsParams};
 use crate::error::ApiError;
 use crate::routes::WsRouterState;
+use crate::middleware::auth::AuthenticatedUser;
+use redis::AsyncCommands;
 use shared::error::DomainError;
+
+pub async fn create_ws_ticket(
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    State(state): State<WsRouterState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let ticket = Uuid::new_v4().to_string();
+    let redis_key = format!("ws:ticket:{}", ticket);
+
+    let mut redis = state.ws_state.redis.clone();
+
+    // Store the ticket in Redis mapping to the user ID with a 30 seconds TTL
+    let _: () = redis.set_ex(&redis_key, auth_user.user_id.to_string(), 30_u64)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to store WS ticket in Redis: {:?}", e);
+            ApiError(DomainError::Internal("Database connection error".to_string()))
+        })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({ "ticket": ticket })),
+    ))
+}
 
 pub async fn ws_handler(
     Query(params): Query<WsParams>,
@@ -27,20 +54,37 @@ pub async fn ws_handler(
     State(state): State<WsRouterState>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
-    let claims = match state.jwt_service.validate_access_token(&params.token) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(ApiError(DomainError::Unauthorized(
-                "Invalid or expired token".to_string(),
+    let mut redis = state.ws_state.redis.clone();
+    let redis_key = format!("ws:ticket:{}", params.ticket);
+
+    // Look up the user ID associated with this ticket
+    let user_id_str: Option<String> = match redis.get(&redis_key).await {
+        Ok(val) => val,
+        Err(e) => {
+            tracing::error!("Failed to retrieve WS ticket from Redis: {:?}", e);
+            return Err(ApiError(DomainError::Internal(
+                "Database connection error".to_string(),
             )));
         }
     };
 
-    let user_id = match Uuid::parse_str(&claims.sub) {
+    let user_id_str = match user_id_str {
+        Some(uid) => uid,
+        None => {
+            return Err(ApiError(DomainError::Unauthorized(
+                "Invalid or expired WebSocket ticket".to_string(),
+            )));
+        }
+    };
+
+    // Delete the ticket immediately to ensure one-time use
+    let _: Result<(), _> = redis.del(&redis_key).await;
+
+    let user_id = match Uuid::parse_str(&user_id_str) {
         Ok(id) => id,
         Err(_) => {
             return Err(ApiError(DomainError::Unauthorized(
-                "Invalid token format".to_string(),
+                "Invalid ticket user identity".to_string(),
             )));
         }
     };

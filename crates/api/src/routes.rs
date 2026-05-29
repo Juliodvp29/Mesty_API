@@ -312,9 +312,18 @@ pub fn create_router(
         ))
         .with_state(blocks_state);
 
+    let ws_ticket_route = Router::new()
+        .route("/ws/ticket", post(crate::handlers::ws::handlers::create_ws_ticket))
+        .route_layer(middleware::from_fn_with_state(
+            auth_middleware_state.clone(),
+            auth_middleware,
+        ))
+        .with_state(ws_router_state.clone());
+
     let ws_routes = Router::new()
         .route("/ws", get(ws_handler))
-        .with_state(ws_router_state);
+        .with_state(ws_router_state)
+        .merge(ws_ticket_route);
 
     let protected_calls_routes = Router::new()
         .route("/calls/turn-credentials", get(get_turn_credentials))
