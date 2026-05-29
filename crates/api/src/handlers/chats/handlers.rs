@@ -30,6 +30,7 @@ use crate::middleware::auth::AuthenticatedUser;
 use crate::services::metrics::MetricsExtension;
 use crate::services::push::{PRESENCE_KEY_PREFIX, PushNotificationJob, enqueue_push_notification};
 use infrastructure::repositories::chat::PostgresChatRepository;
+use crate::services::rate_limit::check_rate_limit;
 
 #[derive(Clone)]
 pub struct ChatsState {
@@ -124,6 +125,21 @@ pub async fn send_message(
     Path(chat_id): Path<Uuid>,
     Json(req): Json<SendMessageRequest>,
 ) -> Result<Response, ApiError> {
+    // Apply rate limit: maximum 15 messages every 10 seconds per user
+    let mut redis = state.redis.clone();
+    let rate_key = format!("msg:{}", auth.user_id);
+    let allowed = check_rate_limit(&mut redis, &rate_key, 15, 10)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+    if !allowed {
+        return Ok((
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(serde_json::json!({ "error": "Too many messages sent. Please slow down." })),
+        )
+            .into_response());
+    }
+
     // Record metric
     metrics.0.read().messages_sent_total.inc();
     let message = state

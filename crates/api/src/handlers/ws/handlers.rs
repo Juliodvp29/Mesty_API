@@ -89,6 +89,28 @@ pub async fn ws_handler(
         }
     };
 
+    // Limit concurrent connections per user to prevent DoS attacks
+    let active_connections = {
+        if let Some(mut entry) = state.ws_state.connections.get_mut(&user_id) {
+            entry.retain(|conn| {
+                if let Ok(guard) = conn.try_lock() {
+                    !guard.is_closed()
+                } else {
+                    true // If locked, assume it's still alive/busy
+                }
+            });
+            entry.len()
+        } else {
+            0
+        }
+    };
+
+    if active_connections >= 5 {
+        return Err(ApiError(DomainError::Conflict(
+            "Too many concurrent WebSocket connections. Maximum is 5.".to_string(),
+        )));
+    }
+
     Ok(
         ws.on_upgrade(move |socket| {
             handle_socket(socket, user_id, state.ws_state.clone(), metrics)
@@ -178,12 +200,15 @@ async fn handle_socket(
         // Decrement active connections
         metrics_for_cleanup.0.read().active_ws_connections.dec();
 
-        if let Some(entry) = connections_for_cleanup.get(&user_id_for_read) {
-            let mut conns = entry.value().clone();
-            conns.retain(|conn| {
+        if let Some(mut entry) = connections_for_cleanup.get_mut(&user_id_for_read) {
+            entry.retain(|conn| {
                 let guard = conn.blocking_lock();
                 !guard.is_closed()
             });
+            if entry.is_empty() {
+                drop(entry);
+                connections_for_cleanup.remove(&user_id_for_read);
+            }
         }
 
         let redis = redis_for_cleanup.clone();
