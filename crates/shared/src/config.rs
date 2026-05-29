@@ -29,6 +29,8 @@ pub struct Config {
     pub smtp: SmtpConfig,
     pub sms: SmsConfig,
     pub push: PushConfig,
+    #[serde(default)]
+    pub turn: TurnConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -90,6 +92,40 @@ pub struct PushConfig {
     pub apns_key_id: Option<String>,
     pub apns_team_id: Option<String>,
     pub apns_bundle_id: String,
+}
+
+/// STUN/TURN server configuration for WebRTC.
+///
+/// Compatible with coturn's `use-auth-secret` mode:
+///   username = "<expires_epoch>:<user_id>"
+///   password = base64(HMAC-SHA1(secret, username))
+///
+/// Set via environment variables (double-underscore separator):
+///   TURN__SECRET, TURN__STUN_URLS, TURN__TURN_URLS, TURN__TTL_SECONDS
+///
+/// `stun_urls` and `turn_urls` are comma-separated lists, e.g.:
+///   TURN__STUN_URLS="stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+///   TURN__TURN_URLS="turn:turn.example.com:3478,turns:turn.example.com:5349"
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct TurnConfig {
+    /// HMAC-SHA1 secret used to sign time-limited credentials.
+    /// If None, only public STUN servers (no credentials) are returned.
+    pub secret: Option<String>,
+    /// Optional override for credential TTL (seconds). Defaults to 3600.
+    pub ttl_seconds: Option<u64>,
+    /// Comma-separated STUN server URLs. Deserialized from env as Vec<String>.
+    #[serde(default = "default_stun_urls")]
+    pub stun_urls: Vec<String>,
+    /// Comma-separated TURN server URLs.
+    #[serde(default)]
+    pub turn_urls: Vec<String>,
+}
+
+fn default_stun_urls() -> Vec<String> {
+    vec![
+        "stun:stun.l.google.com:19302".to_string(),
+        "stun:stun1.l.google.com:19302".to_string(),
+    ]
 }
 
 impl Config {

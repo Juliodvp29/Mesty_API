@@ -30,6 +30,8 @@ impl IntoResponse for ApiError {
             DomainError::AlreadyExists(msg) => (StatusCode::CONFLICT, msg),
             DomainError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
             DomainError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            DomainError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            DomainError::Conflict(msg) => (StatusCode::CONFLICT, msg),
         };
 
         (status, Json(serde_json::json!({ "error": message }))).into_response()

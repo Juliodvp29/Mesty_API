@@ -35,6 +35,7 @@ Mesty is a modular, high-performance backend for real-time messaging application
 
 - 🔑 **End-to-End Encryption** — X3DH key exchange with per-message AES-GCM encryption
 - ⚡ **Real-Time Communication** — WebSocket with presence, typing indicators, and live sync
+- 📞 **Voice & Video Calling (WebRTC)** — Secure, low-latency peer-to-peer audio/video calls with real-time WebSocket signaling and dynamic TURN/STUN credentials
 - 📱 **Multi-Device Support** — Session management across multiple devices per user
 - 📸 **Ephemeral Stories** — 24-hour stories with granular privacy controls and auto-cleanup
 - 👥 **Groups & Channels** — Hierarchical roles (owner/admin/moderator/member), invite links, key rotation
@@ -303,9 +304,15 @@ curl "http://localhost:3000/chats/{chat_id}/messages?cursor={cursor}&direction=b
 
 ### Real-Time (WebSocket)
 
-| Method | Endpoint          | Description          | Auth              |
-| ------ | ----------------- | -------------------- | ----------------- |
-| `GET`  | `/ws?token={jwt}` | Upgrade to WebSocket | JWT (query param) |
+To avoid JWT token exposure in server logs, reverse proxies, and browser history, Mesty implements a **One-Time Ticket** authentication flow for WebSockets:
+
+1. **Request Ticket:** Send an authenticated `POST` request to `/ws/ticket` with the standard `Authorization: Bearer <JWT>` header. The server returns `{"ticket": "<UUID_TICKET>"}` (expires in 30 seconds, single-use).
+2. **Establish Connection:** Connect to `/ws?ticket=<UUID_TICKET>` via the WebSocket protocol. The ticket is immediately validated and consumed upon connection.
+
+| Method | Endpoint             | Description                     | Auth                        |
+| ------ | -------------------- | ------------------------------- | --------------------------- |
+| `POST` | `/ws/ticket`         | Generate temporary one-time ticket | Bearer (JWT)                |
+| `GET`  | `/ws?ticket={ticket}`| Upgrade to WebSocket connection  | One-time ticket (query param)|
 
 **Server → Client Events:**
 
@@ -331,6 +338,30 @@ curl "http://localhost:3000/chats/{chat_id}/messages?cursor={cursor}&direction=b
 | `user:{user_id}:events` | User-targeted events               |
 | `chat:{chat_id}:events` | Chat-scoped events                 |
 | `presence:{user_id}`    | Online/offline presence (TTL: 65s) |
+
+### WebRTC Voice & Video Calls
+
+Mesty integrates full support for voice and video calls using WebRTC for low-latency peer-to-peer streaming, with the backend acting as a signaling broker and dynamic TURN/STUN credential generator.
+
+| Method | Endpoint                    | Description                                                | Auth   |
+| ------ | --------------------------- | ---------------------------------------------------------- | ------ |
+| `GET`  | `/calls/turn-credentials`   | Retrieve dynamic time-limited STUN/TURN server credentials | Bearer |
+
+**WebSocket Signaling Events (Client → Server):**
+
+* `call:initiate` — Initiate a call with an SDP offer.
+* `call:accept` — Accept an incoming call with an SDP answer.
+* `call:reject` — Decline a call (optionally providing a "busy" or "rejected" reason).
+* `call:ice-candidate` — Relay WebRTC ICE candidates directly to the peer.
+* `call:hangup` — End an active or unanswered call.
+
+**WebSocket Events (Server → Client):**
+
+* `call:incoming` — Notifies the receiver of an incoming call with the caller's SDP offer.
+* `call:accepted` — Relays the receiver's SDP answer back to the caller.
+* `call:rejected` — Relays the receiver's rejection/busy reason to the caller.
+* `call:ice-candidate` — Relays a remote ICE candidate to establish the peer-to-peer connection.
+* `call:ended` — Signals the termination of the call (ended, missed, rejected, busy).
 
 ### Stories
 
@@ -440,15 +471,17 @@ Redis serves 7 distinct roles in the system:
 | 6   | `push:queue`            | Push notification job queue       | —      |
 | 7   | `refresh:{hash}`        | Refresh token rotation tracking   | 7 days |
 
-### Rate Limits
+### Rate Limits & Security Policies
 
-| Endpoint                        | Limit   | Window |
-| ------------------------------- | ------- | ------ |
-| `/auth/login`, `/auth/register` | 10 req  | 60s    |
-| `/users/search`                 | 30 req  | 60s    |
-| Message sending                 | 100 req | 60s    |
-| File uploads                    | 20 req  | 60s    |
-| General API                     | 300 req | 60s    |
+| Category / Endpoint              | Limit              | Window | Action on Exceeding              |
+| -------------------------------- | ------------------ | ------ | -------------------------------- |
+| `/auth/login`, `/auth/register`  | 10 req            | 60s    | `429 Too Many Requests`          |
+| OTP Verification (all endpoints) | 3 failed attempts  | —      | Invalidates OTP + `429` Response |
+| `/users/search`                  | 30 req            | 60s    | `429 Too Many Requests`          |
+| Message sending                  | 15 req            | 10s    | `429 Too Many Requests`          |
+| File uploads                     | 20 req            | 60s    | `429 Too Many Requests`          |
+| Concurrent WebSocket connections | 5 active conns     | —      | `409 Conflict` (refuses upgrade) |
+| General API                      | 300 req           | 60s    | `429 Too Many Requests`          |
 
 Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After` (on 429).
 
@@ -567,6 +600,7 @@ docker exec messenger_backend-redis-1 redis-cli GET "otp:recover:+573001234567"
 | 11    | Performance & Caching       | ✅ Done |
 | 12    | Observability & Hardening   | ✅ Done |
 | 13    | Deployment & Production     | ✅ Done |
+| 14    | WebRTC Voice & Video Calls  | ✅ Done |
 
 ## Contributing
 

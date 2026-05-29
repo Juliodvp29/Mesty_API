@@ -19,7 +19,7 @@ impl NotificationType {
             Self::StoryReaction => "story_reaction",
             Self::StoryView => "story_view",
             Self::ParticipantAdded => "participant_added",
-            Self::CallIncoming => "call_incoming",
+            Self::CallIncoming => "call",
         }
     }
 
@@ -29,7 +29,7 @@ impl NotificationType {
             "story_reaction" => Some(Self::StoryReaction),
             "story_view" => Some(Self::StoryView),
             "participant_added" => Some(Self::ParticipantAdded),
-            "call_incoming" => Some(Self::CallIncoming),
+            "call" => Some(Self::CallIncoming),
             _ => None,
         }
     }

@@ -36,3 +36,6 @@ phase05_endpoints.json
 # Scratch
 /scratch/
 
+# Tasks and Features
+FEATURES_TODO.md
+

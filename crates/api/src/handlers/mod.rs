@@ -1,6 +1,7 @@
 pub mod attachments;
 pub mod auth;
 pub mod blocks;
+pub mod calls;
 pub mod chats;
 pub mod contacts;
 pub mod groups;

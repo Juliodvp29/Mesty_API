@@ -16,6 +16,12 @@ pub enum DomainError {
 
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
+
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
+    #[error("Conflict: {0}")]
+    Conflict(String),
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;

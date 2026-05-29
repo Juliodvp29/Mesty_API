@@ -3,9 +3,12 @@ use crate::middleware::logging::logging_middleware;
 use crate::middleware::security::security_headers_middleware;
 use crate::services::metrics::{MetricsExtension, SharedMetrics, metrics_handler};
 use axum::{
-    Router, middleware,
+    Router,
+    http::{HeaderValue, Method, header},
+    middleware,
     routing::{delete, get, patch, post},
 };
+use tower_http::cors::CorsLayer;
 
 use crate::handlers::attachments::{AttachmentsState, confirm_attachment, create_upload_url};
 use crate::handlers::auth::{
@@ -13,6 +16,7 @@ use crate::handlers::auth::{
     register, two_fa_setup, two_fa_setup_verify, two_fa_verify, verify_phone,
 };
 use crate::handlers::blocks::handlers::{BlocksState, block_user, list_blocked, unblock_user};
+use crate::handlers::calls::{CallsState, get_turn_credentials};
 use crate::handlers::chats::{
     ChatsState, add_reaction, create_chat, delete_chat, delete_message, delete_read_notifications,
     edit_message, get_chat, list_chats, list_messages, list_notifications,
@@ -42,7 +46,9 @@ use crate::middleware::auth::{AuthMiddlewareState, auth_middleware};
 use crate::services::jwt::JwtService;
 use crate::services::otp::OtpService;
 use crate::services::storage::S3StorageService;
+use domain::call::{CallRepository, CallService};
 use infrastructure::cache::ProfileCache;
+use infrastructure::repositories::call::PostgresCallRepository;
 use infrastructure::repositories::chat::PostgresChatRepository;
 use infrastructure::repositories::contact::PostgresContactRepository;
 use infrastructure::repositories::keys::PostgresKeyRepository;
@@ -151,7 +157,15 @@ pub fn create_router(
         redis_url: config.redis.url.clone(),
         user_repo: user_repo.clone(),
         chat_repo: chat_repo.clone(),
+        call_service: {
+            let call_repo = Arc::new(PostgresCallRepository::new(db_pool.clone()));
+            Arc::new(CallService::new(call_repo as Arc<dyn CallRepository>))
+        },
     });
+
+    let calls_state = CallsState {
+        turn_config: Arc::new(config.turn.clone()),
+    };
 
     let ws_router_state = WsRouterState {
         jwt_service: jwt_service.clone(),
@@ -298,9 +312,29 @@ pub fn create_router(
         ))
         .with_state(blocks_state);
 
+    let ws_ticket_route = Router::new()
+        .route(
+            "/ws/ticket",
+            post(crate::handlers::ws::handlers::create_ws_ticket),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            auth_middleware_state.clone(),
+            auth_middleware,
+        ))
+        .with_state(ws_router_state.clone());
+
     let ws_routes = Router::new()
         .route("/ws", get(ws_handler))
-        .with_state(ws_router_state);
+        .with_state(ws_router_state)
+        .merge(ws_ticket_route);
+
+    let protected_calls_routes = Router::new()
+        .route("/calls/turn-credentials", get(get_turn_credentials))
+        .route_layer(middleware::from_fn_with_state(
+            auth_middleware_state.clone(),
+            auth_middleware,
+        ))
+        .with_state(calls_state);
 
     let public_routes = Router::new()
         .route("/health", get(health))
@@ -314,6 +348,24 @@ pub fn create_router(
         .route("/auth/2fa/verify", post(two_fa_verify))
         .route("/auth/refresh", post(refresh));
 
+    let origins: Vec<HeaderValue> = config
+        .server
+        .cors_origins
+        .split(',')
+        .map(|s| s.parse().expect("Invalid CORS origin"))
+        .collect();
+
+    let cors = CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
+
     public_routes
         .merge(ws_routes)
         .merge(protected_auth_routes)
@@ -325,6 +377,8 @@ pub fn create_router(
         .merge(protected_user_routes)
         .merge(protected_contact_routes)
         .merge(protected_block_routes)
+        .merge(protected_calls_routes)
+        .layer(cors)
         .layer(middleware::from_fn(security_headers_middleware))
         .layer(middleware::from_fn(logging_middleware))
         .layer(axum::extract::Extension(MetricsExtension(metrics)))
