@@ -315,13 +315,14 @@ pub async fn verify_phone(
     let phone =
         PhoneNumber::new(req.phone.clone()).map_err(|e| DomainError::Validation(e.to_string()))?;
 
-    // Check if user already exists to prevent race condition between OTP verification and creation
-    if state.user_repo.find_by_phone(&phone).await?.is_some() {
-        return Err(DomainError::AlreadyExists("User already registered".to_string()).into());
-    }
-
     let user = User::new(None, phone, None, state.phone_hash_secret.as_bytes());
-    state.user_repo.create(&user).await?;
+    match state.user_repo.create(&user).await {
+        Ok(_) => {}
+        Err(DomainError::AlreadyExists(_)) => {
+            return Err(DomainError::AlreadyExists("User already registered".to_string()).into());
+        }
+        Err(e) => return Err(e.into()),
+    }
 
     let device = DeviceContext::from_parts(
         req.device_id,
