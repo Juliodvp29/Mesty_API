@@ -23,6 +23,7 @@ env:
   SERVER__PORT: 3000
   SERVER__CORS_ORIGINS: "*"
   SERVER__RATE_LIMIT_ENABLED: false
+  SERVER__PHONE_HASH_SECRET: test_phone_hash_secret_value_32_bytes_long
   DATABASE__URL: postgres://messenger:messenger_secret@127.0.0.1:5434/messenger_test
   DATABASE_URL: postgres://messenger:messenger_secret@127.0.0.1:5434/messenger_test
   REDIS__URL: redis://127.0.0.1:6379
