@@ -665,7 +665,7 @@ pub async fn two_fa_verify(
         .jwt_service
         .validate_access_token(&req.temp_token)
         .map_err(|e| DomainError::Unauthorized(e.to_string()))?;
-    if claims.sid != "temp" {
+    if claims.sid != crate::services::jwt::TEMP_SESSION_ID {
         return Err(DomainError::Unauthorized("Token temporal invalido".to_string()).into());
     }
 
