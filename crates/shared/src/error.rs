@@ -28,18 +28,18 @@ impl DomainError {
     pub fn from_sqlx(e: sqlx::Error) -> Self {
         match e {
             sqlx::Error::RowNotFound => DomainError::NotFound("Resource not found".into()),
-            sqlx::Error::Database(db_err) => {
-                match db_err.code().as_deref() {
-                    Some("23505") => DomainError::AlreadyExists("Resource already exists".into()),
-                    Some("23503") => DomainError::Validation("Referenced resource not found".into()),
-                    Some("23514") => DomainError::Validation("Validation constraint failed".into()),
-                    _ => {
-                        tracing::error!(db_error = %db_err, "Database error");
-                        DomainError::Internal("Database operation failed".into())
-                    }
+            sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
+                Some("23505") => DomainError::AlreadyExists("Resource already exists".into()),
+                Some("23503") => DomainError::Validation("Referenced resource not found".into()),
+                Some("23514") => DomainError::Validation("Validation constraint failed".into()),
+                _ => {
+                    tracing::error!(db_error = %db_err, "Database error");
+                    DomainError::Internal("Database operation failed".into())
                 }
+            },
+            sqlx::Error::PoolTimedOut => {
+                DomainError::Internal("Service temporarily unavailable".into())
             }
-            sqlx::Error::PoolTimedOut => DomainError::Internal("Service temporarily unavailable".into()),
             _ => {
                 tracing::error!(error = %e, "Unexpected database error");
                 DomainError::Internal("An unexpected error occurred".into())
@@ -57,7 +57,5 @@ impl DomainError {
         }
     }
 }
-
-
 
 pub type DomainResult<T> = Result<T, DomainError>;

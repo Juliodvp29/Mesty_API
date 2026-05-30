@@ -90,11 +90,7 @@ impl ChatRepository for PostgresChatRepository {
         let chat_id = if let Some((chat_id,)) = existing {
             chat_id
         } else {
-            let mut tx = self
-                .pool
-                .begin()
-                .await
-                .map_err(DomainError::from_sqlx)?;
+            let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
             let (new_chat_id,) = sqlx::query_as::<_, (Uuid,)>(
                 r#"
@@ -123,9 +119,7 @@ impl ChatRepository for PostgresChatRepository {
             .await
             .map_err(DomainError::from_sqlx)?;
 
-            tx.commit()
-                .await
-                .map_err(DomainError::from_sqlx)?;
+            tx.commit().await.map_err(DomainError::from_sqlx)?;
 
             new_chat_id
         };
@@ -141,11 +135,7 @@ impl ChatRepository for PostgresChatRepository {
         name: &str,
         participant_ids: &[Uuid],
     ) -> DomainResult<Chat> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let (chat_id,) = sqlx::query_as::<_, (Uuid,)>(
             r#"
@@ -190,9 +180,7 @@ impl ChatRepository for PostgresChatRepository {
             .map_err(DomainError::from_sqlx)?;
         }
 
-        tx.commit()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         self.get_chat_for_user(creator_id, chat_id)
             .await?
@@ -381,11 +369,7 @@ impl ChatRepository for PostgresChatRepository {
         chat_id: Uuid,
         message: NewMessage,
     ) -> DomainResult<ChatMessage> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let chat_type = ensure_active_membership(&mut tx, sender_id, chat_id).await?;
         if chat_type == "private" {
@@ -457,9 +441,7 @@ impl ChatRepository for PostgresChatRepository {
         .await
         .map_err(DomainError::from_sqlx)?;
 
-        tx.commit()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         Ok(map_message_row(inserted))
     }
@@ -649,11 +631,7 @@ impl ChatRepository for PostgresChatRepository {
     }
 
     async fn confirm_attachment(&self, input: ConfirmAttachmentInput) -> DomainResult<()> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let chat_id = sqlx::query_scalar::<_, Uuid>(
             r#"
@@ -701,9 +679,7 @@ impl ChatRepository for PostgresChatRepository {
             ));
         }
 
-        tx.commit()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
         Ok(())
     }
 
@@ -1751,11 +1727,7 @@ impl ChatRepository for PostgresChatRepository {
             ));
         }
 
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let mut updated = 0usize;
         for (member_id, new_key) in &keys {
@@ -1776,9 +1748,7 @@ impl ChatRepository for PostgresChatRepository {
             updated += result.rows_affected() as usize;
         }
 
-        tx.commit()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         Ok(updated)
     }
@@ -1811,11 +1781,7 @@ impl ChatRepository for PostgresChatRepository {
 
         let _ = new_role; // any role is fine — we'll promote them
 
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         // Demote current owner to admin
         sqlx::query(
@@ -1837,9 +1803,7 @@ impl ChatRepository for PostgresChatRepository {
         .await
         .map_err(DomainError::from_sqlx)?;
 
-        tx.commit()
-            .await
-            .map_err(DomainError::from_sqlx)?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
