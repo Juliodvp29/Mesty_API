@@ -9,10 +9,9 @@ use infrastructure::repositories::chat::PostgresChatRepository;
 use infrastructure::repositories::user::PostgresUserRepository;
 use redis::aio::ConnectionManager;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
-pub type WsConnection = Arc<Mutex<tokio::sync::mpsc::Sender<String>>>;
+pub type WsConnection = tokio::sync::mpsc::Sender<String>;
 pub type WsConnections = DashMap<Uuid, Vec<WsConnection>>;
 
 pub struct WsState {

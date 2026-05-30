@@ -14,7 +14,7 @@ use futures_util::{SinkExt, StreamExt};
 use infrastructure::repositories::chat::PostgresChatRepository;
 use serde_json::json;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::WsState;
@@ -92,13 +92,7 @@ pub async fn ws_handler(
     // Limit concurrent connections per user to prevent DoS attacks
     let active_connections = {
         if let Some(mut entry) = state.ws_state.connections.get_mut(&user_id) {
-            entry.retain(|conn| {
-                if let Ok(guard) = conn.try_lock() {
-                    !guard.is_closed()
-                } else {
-                    true // If locked, assume it's still alive/busy
-                }
-            });
+            entry.retain(|conn| !conn.is_closed());
             entry.len()
         } else {
             0
@@ -133,7 +127,7 @@ async fn handle_socket(
 
     {
         let mut user_connections = ws_state.connections.entry(user_id).or_default();
-        user_connections.push(Arc::new(Mutex::new(tx.clone())));
+        user_connections.push(tx.clone());
     }
 
     let redis = ws_state.redis.clone();
@@ -201,10 +195,7 @@ async fn handle_socket(
         metrics_for_cleanup.0.read().active_ws_connections.dec();
 
         if let Some(mut entry) = connections_for_cleanup.get_mut(&user_id_for_read) {
-            entry.retain(|conn| {
-                let guard = conn.blocking_lock();
-                !guard.is_closed()
-            });
+            entry.retain(|conn| !conn.is_closed());
             if entry.is_empty() {
                 drop(entry);
                 connections_for_cleanup.remove(&user_id_for_read);
@@ -648,34 +639,25 @@ async fn sync_messages_after(
     user_id: Uuid,
     since: DateTime<Utc>,
 ) -> Result<Vec<serde_json::Value>, ()> {
-    use domain::chat::repository::{ChatRepository, MessageDirection};
+    use domain::chat::repository::ChatRepository;
 
-    let chat_previews = chat_repo
-        .list_chats_for_user(user_id, None, 50)
+    let messages = chat_repo
+        .list_messages_since(user_id, since, 100)
         .await
         .map_err(|_| ())?;
 
     let mut all_messages = Vec::new();
 
-    for preview in chat_previews {
-        let messages = chat_repo
-            .list_messages(user_id, preview.chat_id, None, MessageDirection::Before, 50)
-            .await
-            .map_err(|_| ())?;
-
-        for msg in messages {
-            if msg.created_at > since {
-                all_messages.push(serde_json::json!({
-                    "chat_id": msg.chat_id,
-                    "message_id": msg.id,
-                    "sender_id": msg.sender_id,
-                    "content_encrypted": msg.content_encrypted,
-                    "content_iv": msg.content_iv,
-                    "message_type": msg.message_type,
-                    "created_at": msg.created_at,
-                }));
-            }
-        }
+    for msg in messages {
+        all_messages.push(serde_json::json!({
+            "chat_id": msg.chat_id,
+            "message_id": msg.id,
+            "sender_id": msg.sender_id,
+            "content_encrypted": msg.content_encrypted,
+            "content_iv": msg.content_iv,
+            "message_type": msg.message_type,
+            "created_at": msg.created_at,
+        }));
     }
 
     Ok(all_messages)
