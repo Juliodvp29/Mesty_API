@@ -14,7 +14,7 @@ use futures_util::{SinkExt, StreamExt};
 use infrastructure::repositories::chat::PostgresChatRepository;
 use serde_json::json;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::WsState;
@@ -92,13 +92,7 @@ pub async fn ws_handler(
     // Limit concurrent connections per user to prevent DoS attacks
     let active_connections = {
         if let Some(mut entry) = state.ws_state.connections.get_mut(&user_id) {
-            entry.retain(|conn| {
-                if let Ok(guard) = conn.try_lock() {
-                    !guard.is_closed()
-                } else {
-                    true // If locked, assume it's still alive/busy
-                }
-            });
+            entry.retain(|conn| !conn.is_closed());
             entry.len()
         } else {
             0
@@ -133,7 +127,7 @@ async fn handle_socket(
 
     {
         let mut user_connections = ws_state.connections.entry(user_id).or_default();
-        user_connections.push(Arc::new(Mutex::new(tx.clone())));
+        user_connections.push(tx.clone());
     }
 
     let redis = ws_state.redis.clone();
@@ -201,10 +195,7 @@ async fn handle_socket(
         metrics_for_cleanup.0.read().active_ws_connections.dec();
 
         if let Some(mut entry) = connections_for_cleanup.get_mut(&user_id_for_read) {
-            entry.retain(|conn| {
-                let guard = conn.blocking_lock();
-                !guard.is_closed()
-            });
+            entry.retain(|conn| !conn.is_closed());
             if entry.is_empty() {
                 drop(entry);
                 connections_for_cleanup.remove(&user_id_for_read);
