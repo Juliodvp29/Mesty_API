@@ -97,6 +97,7 @@ pub fn create_router(
         user_repo: user_repo.clone(),
         otp_service: otp_service.clone(),
         jwt_service: jwt_service.clone(),
+        phone_hash_secret: config.server.phone_hash_secret.clone(),
     };
 
     let keys_state = KeysState {
@@ -137,6 +138,7 @@ pub fn create_router(
     let contacts_state = ContactsState {
         contact_repo: contact_repo.clone(),
         user_repo: user_repo.clone(),
+        phone_hash_secret: config.server.phone_hash_secret.clone(),
     };
 
     let blocks_state = BlocksState {

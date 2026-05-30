@@ -48,6 +48,15 @@ pub async fn auth_middleware(
         Ok(value) => value,
         Err(_) => return unauthorized_response("Malformed token subject"),
     };
+
+    // Rechazar explícitamente tokens temporales de 2FA / recuperación en rutas protegidas.
+    // Estos tokens tienen sid = TEMP_SESSION_ID y solo son válidos para /auth/2fa/verify
+    // y /auth/recover/verify, que los consumen directamente desde el body sin pasar por este middleware.
+    if claims.sid == crate::services::jwt::TEMP_SESSION_ID {
+        tracing::warn!(user_id = %user_id, "Rejected attempt to use a temporary 2FA token on a protected route");
+        return unauthorized_response("Temporary 2FA token cannot be used for this endpoint");
+    }
+
     let session_id = match Uuid::parse_str(&claims.sid) {
         Ok(value) => value,
         Err(_) => return unauthorized_response("Malformed token session"),

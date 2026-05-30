@@ -26,6 +26,7 @@ pub struct AuthState {
     pub user_repo: Arc<PostgresUserRepository>,
     pub otp_service: Arc<OtpService>,
     pub jwt_service: Arc<JwtService>,
+    pub phone_hash_secret: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -319,7 +320,7 @@ pub async fn verify_phone(
         return Err(DomainError::AlreadyExists("User already registered".to_string()).into());
     }
 
-    let user = User::new(None, phone, None);
+    let user = User::new(None, phone, None, state.phone_hash_secret.as_bytes());
     state.user_repo.create(&user).await?;
 
     let device = DeviceContext::from_parts(
@@ -665,7 +666,7 @@ pub async fn two_fa_verify(
         .jwt_service
         .validate_access_token(&req.temp_token)
         .map_err(|e| DomainError::Unauthorized(e.to_string()))?;
-    if claims.sid != "temp" {
+    if claims.sid != crate::services::jwt::TEMP_SESSION_ID {
         return Err(DomainError::Unauthorized("Token temporal invalido".to_string()).into());
     }
 

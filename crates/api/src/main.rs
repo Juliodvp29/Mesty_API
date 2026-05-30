@@ -4,6 +4,7 @@ use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
 use redis::Client;
 use redis::aio::ConnectionManager;
 use shared::config::Config;
+use shared::hash::hash_phone;
 use shared::logging::{AppEnv, init_logging};
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
@@ -36,6 +37,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let redis_manager = ConnectionManager::new(redis_client.clone())
         .await
         .expect("Could not connect to Redis");
+
+    // Migrar phone_hashes de SHA-256 plano → HMAC-SHA256 si el secreto está configurado.
+    if let Err(e) =
+        rehash_phone_numbers(&db_pool, &redis_manager, &config.server.phone_hash_secret).await
+    {
+        tracing::error!("phone_hash rehash migration failed: {:?}", e);
+    }
 
     let metrics = create_metrics().expect("Failed to create metrics");
 
@@ -92,5 +100,78 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     axum::serve(listener, app).await?;
 
+    Ok(())
+}
+
+/// Migra registros de usuarios cuyo `phone_hash` aún use SHA-256 plano al nuevo HMAC-SHA256.
+///
+/// La detección se hace comparando `encode(digest(phone, 'sha256'), 'hex')` con el
+/// `phone_hash` almacenado. Si coinciden, el registro usa el formato antiguo.
+/// La función carga el teléfono en texto claro (ya almacenado en la columna `phone`),
+/// recalcula el HMAC-SHA256 con el secreto de servidor y actualiza la fila.
+async fn rehash_phone_numbers(
+    pool: &sqlx::PgPool,
+    redis: &ConnectionManager,
+    secret: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Seleccionar usuarios donde phone_hash coincide con el SHA-256 plano (formato antiguo)
+    let rows = sqlx::query!(
+        r#"
+        SELECT id, phone, phone_hash
+        FROM users
+        WHERE deleted_at IS NULL
+          AND phone_hash IS NOT NULL
+          AND phone_hash = encode(digest(phone, 'sha256'), 'hex')
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    if rows.is_empty() {
+        tracing::info!("phone_hash rehash: no legacy SHA-256 records found, nothing to migrate.");
+        return Ok(());
+    }
+
+    tracing::info!(
+        "phone_hash rehash: found {} record(s) with legacy SHA-256 hash, migrating…",
+        rows.len()
+    );
+
+    let secret_bytes = secret.as_bytes();
+    let mut redis_conn = redis.clone();
+
+    for row in rows {
+        let old_hash = row.phone_hash.clone().unwrap_or_default();
+        let new_hash = hash_phone(&row.phone, secret_bytes);
+
+        // Actualizar Postgres
+        sqlx::query!(
+            "UPDATE users SET phone_hash = $1 WHERE id = $2",
+            new_hash,
+            row.id
+        )
+        .execute(pool)
+        .await?;
+
+        // Actualizar Redis set phone_hashes: remover viejo, insertar nuevo
+        use redis::AsyncCommands;
+        let _: () = redis_conn
+            .srem("phone_hashes", &old_hash)
+            .await
+            .unwrap_or(());
+        let _: () = redis_conn
+            .sadd("phone_hashes", &new_hash)
+            .await
+            .unwrap_or(());
+
+        tracing::debug!(
+            user_id = %row.id,
+            "phone_hash rehash: migrated {} → {}",
+            &old_hash[..8],
+            &new_hash[..8]
+        );
+    }
+
+    tracing::info!("phone_hash rehash: migration complete.");
     Ok(())
 }

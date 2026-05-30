@@ -39,6 +39,10 @@ pub struct ServerConfig {
     pub port: u16,
     pub cors_origins: String,
     pub rate_limit_enabled: bool,
+    /// Clave secreta usada para HMAC-SHA256 del phone_hash.
+    /// Configura vía env: SERVER__PHONE_HASH_SECRET
+    /// Genera con: openssl rand -hex 32
+    pub phone_hash_secret: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -12,7 +12,8 @@ pub struct ContactResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct SyncRequest {
-    pub hashes: Vec<String>,
+    /// Números de teléfono E.164 del dispositivo (el servidor calcula el hash internamente).
+    pub phones: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]

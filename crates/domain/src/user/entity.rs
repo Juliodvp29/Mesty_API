@@ -22,9 +22,14 @@ pub struct User {
 use shared::hash::hash_phone;
 
 impl User {
-    pub fn new(username: Option<Username>, phone: PhoneNumber, email: Option<Email>) -> Self {
+    pub fn new(
+        username: Option<Username>,
+        phone: PhoneNumber,
+        email: Option<Email>,
+        phone_hash_secret: &[u8],
+    ) -> Self {
         let now = Utc::now();
-        let phone_hash = hash_phone(phone.as_str());
+        let phone_hash = hash_phone(phone.as_str(), phone_hash_secret);
         Self {
             id: UserId::new(),
             username,

@@ -40,7 +40,7 @@ Mesty is a modular, high-performance backend for real-time messaging application
 - 📸 **Ephemeral Stories** — 24-hour stories with granular privacy controls and auto-cleanup
 - 👥 **Groups & Channels** — Hierarchical roles (owner/admin/moderator/member), invite links, key rotation
 - 🔔 **Push Notifications** — FCM (Android/Web) and APNs (iOS) with privacy-safe payloads
-- 📇 **Privacy-Preserving Contact Sync** — SHA-256 hashed phone numbers, never sent in plaintext
+- 📇 **Privacy-Preserving Contact Sync** — Phone numbers hashed server-side with **HMAC-SHA-256** + server secret; never stored as recoverable plaintext
 - 🚦 **Rate Limiting** — Sliding window with Lua-scripted atomic Redis operations
 - 📊 **Observability** — Prometheus metrics, structured JSON logging, request tracing
 - 🐳 **Production-Ready** — Multi-stage Docker build, Caddy auto-TLS, docker-compose orchestration
@@ -451,7 +451,7 @@ Mesty is designed with a **zero-trust** approach to user data:
 | **Two-Factor Auth**  | TOTP with backup codes via `totp-rs`.                                                                         |
 | **Session Security** | Refresh token rotation (one-time use). Multi-device session management.                                       |
 | **Rate Limiting**    | Sliding window via Redis Lua scripts. Per-endpoint configurable limits.                                       |
-| **Contact Sync**     | Phone numbers are SHA-256 hashed with a global salt before transmission.                                      |
+| **Contact Sync**     | Phone numbers are hashed server-side with **HMAC-SHA-256** keyed on `SERVER__PHONE_HASH_SECRET`. Clients send E.164 numbers; the server computes and stores the HMAC, preventing rainbow-table attacks on the stored hashes. |
 | **HTTP Hardening**   | Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `X-Request-Id`.   |
 | **Push Privacy**     | Push notification payloads **never** include message content.                                                 |
 

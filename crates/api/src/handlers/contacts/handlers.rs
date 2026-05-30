@@ -14,6 +14,7 @@ use domain::user::value_objects::UserId as DomainUserId;
 use infrastructure::repositories::contact::PostgresContactRepository;
 use infrastructure::repositories::user::PostgresUserRepository;
 use shared::error::DomainError;
+use shared::hash::{hash_phone, hash_phone_sha256};
 
 use super::dto::{
     ContactResponse, CreateContactRequest, SyncMatch, SyncRequest, SyncResponse,
@@ -24,6 +25,7 @@ use super::dto::{
 pub struct ContactsState {
     pub contact_repo: Arc<PostgresContactRepository>,
     pub user_repo: Arc<PostgresUserRepository>,
+    pub phone_hash_secret: String,
 }
 
 pub async fn sync_contacts(
@@ -31,26 +33,43 @@ pub async fn sync_contacts(
     Extension(auth): Extension<AuthenticatedUser>,
     Json(req): Json<SyncRequest>,
 ) -> Result<Response, ApiError> {
-    if req.hashes.is_empty() || req.hashes.len() > 1000 {
+    if req.phones.is_empty() || req.phones.len() > 1000 {
         return Ok((
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "Hashes list must be between 1 and 1000 items" })),
+            Json(serde_json::json!({ "error": "Phone list must be between 1 and 1000 items" })),
         )
             .into_response());
     }
 
+    // Calcular HMAC-SHA256 de cada teléfono para buscar en Redis/Postgres.
+    // El cliente nunca conoce ni el secreto ni los hashes almacenados.
+    let secret = state.phone_hash_secret.as_bytes();
+    let hmac_hashes: Vec<String> = req.phones.iter().map(|p| hash_phone(p, secret)).collect();
+
     let matches = state
         .contact_repo
-        .sync_contacts(&auth.user_id, &req.hashes)
+        .sync_contacts(&auth.user_id, &hmac_hashes)
         .await?;
 
+    // El campo `hash` de la respuesta usa SHA-256 plano para que el cliente pueda
+    // mapear la respuesta a sus contactos locales sin conocer el secreto del servidor.
     let response: Vec<SyncMatch> = matches
         .into_iter()
-        .map(|(hash, user_id, username, display_name)| SyncMatch {
-            hash,
-            user_id,
-            username,
-            display_name,
+        .map(|(hmac_hash, user_id, username, display_name)| {
+            // Localizar el teléfono original que produjo este hmac_hash
+            let original_phone = req
+                .phones
+                .iter()
+                .zip(hmac_hashes.iter())
+                .find(|(_, h)| *h == &hmac_hash)
+                .map(|(p, _)| p.as_str())
+                .unwrap_or("");
+            SyncMatch {
+                hash: hash_phone_sha256(original_phone),
+                user_id,
+                username,
+                display_name,
+            }
         })
         .collect();
 

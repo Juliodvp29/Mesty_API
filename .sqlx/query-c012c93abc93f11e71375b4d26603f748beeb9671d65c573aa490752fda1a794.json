@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, phone, phone_hash\n        FROM users\n        WHERE deleted_at IS NULL\n          AND phone_hash IS NOT NULL\n          AND phone_hash = encode(digest(phone, 'sha256'), 'hex')\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "phone",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "phone_hash",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "c012c93abc93f11e71375b4d26603f748beeb9671d65c573aa490752fda1a794"
+}

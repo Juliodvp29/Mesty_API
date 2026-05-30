@@ -1,0 +1,16 @@
+-- 020_rehash_phone_hashes_info.sql
+-- ============================================================
+-- NOTA: La migración real de phone_hash (SHA-256 → HMAC-SHA256) NO se realiza en SQL.
+--
+-- La migración ocurre automáticamente en Rust al inicio del servidor (main.rs),
+-- porque necesita la clave secreta SERVER__PHONE_HASH_SECRET, que nunca debe estar
+-- en texto plano dentro del repositorio Git ni en los archivos de migración.
+--
+-- Pasos automáticos al iniciar el servidor:
+--   1. Se detectan usuarios cuyo phone_hash == sha256(phone) (formato antiguo).
+--   2. Se recalcula HMAC-SHA256(phone, SERVER__PHONE_HASH_SECRET) para cada uno.
+--   3. Se actualiza la fila en Postgres.
+--   4. Se actualiza el set "phone_hashes" en Redis (srem viejo, sadd nuevo).
+--
+-- Esta migración es idempotente: una vez que todos los registros usen HMAC-SHA256,
+-- no se realiza ninguna acción en inicios subsiguientes.

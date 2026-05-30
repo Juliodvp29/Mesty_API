@@ -6,6 +6,10 @@ use uuid::Uuid;
 
 use crate::services::error::ServiceError;
 
+/// Valor reservado para el campo `sid` de tokens de autenticación de 2FA / recuperación.
+/// Estos tokens son temporales y NO deben ser aceptados en rutas protegidas.
+pub const TEMP_SESSION_ID: &str = "temp";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccessClaims {
     pub sub: String,
@@ -90,7 +94,7 @@ impl JwtService {
         let now = chrono::Utc::now().timestamp();
         let claims = AccessClaims {
             sub: user_id.to_string(),
-            sid: "temp".to_string(),
+            sid: TEMP_SESSION_ID.to_string(),
             exp: now + 300,
             iat: now,
         };
