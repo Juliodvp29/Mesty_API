@@ -62,7 +62,7 @@ impl PostgresUserRepository {
         .bind(expires_at)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(record.0)
     }
@@ -85,7 +85,7 @@ impl PostgresUserRepository {
             .bind(user_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
         Ok(records
             .into_iter()
@@ -107,7 +107,7 @@ impl PostgresUserRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -123,7 +123,7 @@ impl PostgresUserRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(exists.is_some())
     }
@@ -169,7 +169,7 @@ impl UserRepository for PostgresUserRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if let Some(mut redis) = self.redis.clone() {
             use redis::AsyncCommands;
@@ -207,7 +207,7 @@ impl UserRepository for PostgresUserRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_user).transpose()
     }
@@ -237,7 +237,7 @@ impl UserRepository for PostgresUserRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_user).transpose()
     }
@@ -267,7 +267,7 @@ impl UserRepository for PostgresUserRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         record.map(map_record_to_user).transpose()
     }
@@ -301,7 +301,7 @@ impl UserRepository for PostgresUserRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         // Note: Update phone_hash in Redis if it changed (though phone updates are rare)
         if let Some(mut redis) = self.redis.clone() {
@@ -326,7 +326,7 @@ impl UserRepository for PostgresUserRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if let (Some(u), Some(mut redis)) = (user, self.redis.clone()) {
             use redis::AsyncCommands;
@@ -353,7 +353,7 @@ impl UserRepository for PostgresUserRepository {
         .bind(timestamp)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -417,7 +417,7 @@ impl PostgresUserRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(records)
     }
@@ -446,7 +446,7 @@ impl PostgresUserRepository {
         .bind(*user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(record)
     }
@@ -465,7 +465,7 @@ impl PostgresUserRepository {
         .bind(blocked_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(exists.is_some())
     }
@@ -484,7 +484,7 @@ impl PostgresUserRepository {
         .bind(blocked_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(id)
     }
@@ -496,7 +496,7 @@ impl PostgresUserRepository {
                 .bind(blocked_id)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(DomainError::from_sqlx)?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -510,7 +510,7 @@ impl PostgresUserRepository {
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(records)
     }
@@ -524,7 +524,7 @@ impl PostgresUserRepository {
         .bind(phone)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(id)
     }

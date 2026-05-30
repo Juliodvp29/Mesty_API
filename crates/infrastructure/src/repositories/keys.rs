@@ -43,7 +43,7 @@ impl KeyRepository for PostgresKeyRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -68,7 +68,7 @@ impl KeyRepository for PostgresKeyRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         sqlx::query!(
             r#"
@@ -84,7 +84,7 @@ impl KeyRepository for PostgresKeyRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -107,7 +107,7 @@ impl KeyRepository for PostgresKeyRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(row.map(|r| UserKeys {
             user_id: r.user_id,
@@ -131,7 +131,7 @@ impl KeyRepository for PostgresKeyRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(count.unwrap_or(0))
     }
@@ -147,7 +147,7 @@ impl KeyRepository for PostgresKeyRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(blocked.is_some())
     }
@@ -164,7 +164,7 @@ impl KeyRepository for PostgresKeyRepository {
         .bind(target_user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(row.map(
             |r: (String, String, i32, String, Option<i32>, Option<String>)| KeyBundleWithOpk {

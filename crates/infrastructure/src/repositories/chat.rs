@@ -85,16 +85,12 @@ impl ChatRepository for PostgresChatRepository {
         .bind(participant_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let chat_id = if let Some((chat_id,)) = existing {
             chat_id
         } else {
-            let mut tx = self
-                .pool
-                .begin()
-                .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+            let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
             let (new_chat_id,) = sqlx::query_as::<_, (Uuid,)>(
                 r#"
@@ -106,7 +102,7 @@ impl ChatRepository for PostgresChatRepository {
             .bind(creator_id)
             .fetch_one(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
             sqlx::query(
                 r#"
@@ -121,11 +117,9 @@ impl ChatRepository for PostgresChatRepository {
             .bind(participant_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
-            tx.commit()
-                .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+            tx.commit().await.map_err(DomainError::from_sqlx)?;
 
             new_chat_id
         };
@@ -141,11 +135,7 @@ impl ChatRepository for PostgresChatRepository {
         name: &str,
         participant_ids: &[Uuid],
     ) -> DomainResult<Chat> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let (chat_id,) = sqlx::query_as::<_, (Uuid,)>(
             r#"
@@ -158,7 +148,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(creator_id)
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         sqlx::query(
             r#"
@@ -170,7 +160,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(creator_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if !participant_ids.is_empty() {
             sqlx::query(
@@ -187,12 +177,10 @@ impl ChatRepository for PostgresChatRepository {
             .bind(participant_ids)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
         }
 
-        tx.commit()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         self.get_chat_for_user(creator_id, chat_id)
             .await?
@@ -226,7 +214,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         row.map(
             |(id, chat_type, name, description, avatar_url, created_by, created_at)| {
@@ -333,7 +321,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(page_size)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         rows.into_iter()
             .map(
@@ -381,11 +369,7 @@ impl ChatRepository for PostgresChatRepository {
         chat_id: Uuid,
         message: NewMessage,
     ) -> DomainResult<ChatMessage> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let chat_type = ensure_active_membership(&mut tx, sender_id, chat_id).await?;
         if chat_type == "private" {
@@ -438,7 +422,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(message.is_forwarded)
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let message_id = inserted.0;
         sqlx::query(
@@ -455,11 +439,9 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
-        tx.commit()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         Ok(map_message_row(inserted))
     }
@@ -533,7 +515,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(page_size)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if matches!(direction, MessageDirection::Before) {
             rows.reverse();
@@ -583,7 +565,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(input.file_name)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(PendingAttachment {
             id: row.0,
@@ -632,7 +614,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(uploader_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(row.map(|r| PendingAttachment {
             id: r.0,
@@ -649,11 +631,7 @@ impl ChatRepository for PostgresChatRepository {
     }
 
     async fn confirm_attachment(&self, input: ConfirmAttachmentInput) -> DomainResult<()> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let chat_id = sqlx::query_scalar::<_, Uuid>(
             r#"
@@ -666,7 +644,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(input.message_id)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?
+        .map_err(DomainError::from_sqlx)?
         .ok_or_else(|| DomainError::NotFound("message not found".to_string()))?;
 
         ensure_active_membership(&mut tx, input.uploader_id, chat_id).await?;
@@ -693,7 +671,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if updated.rows_affected() == 0 {
             return Err(DomainError::NotFound(
@@ -701,9 +679,7 @@ impl ChatRepository for PostgresChatRepository {
             ));
         }
 
-        tx.commit()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
         Ok(())
     }
 
@@ -724,7 +700,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if exists.is_none() {
             return Err(DomainError::NotFound(
@@ -749,7 +725,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if exists.is_none() {
             return Err(DomainError::NotFound(
@@ -775,7 +751,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(up_to)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(updated_count)
     }
@@ -799,7 +775,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(&reaction)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(MessageReaction {
             id: reaction_record.0,
@@ -829,7 +805,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(reaction)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -866,7 +842,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let new_name = name.or(current_name);
         let new_desc = description.or(current_desc);
@@ -886,7 +862,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(new_avatar.clone())
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let parsed_type = ChatType::from_db_str(&chat_type)
             .ok_or_else(|| DomainError::Internal("invalid chat type".to_string()))?;
@@ -918,7 +894,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let chat_type = chat_exists.ok_or_else(|| {
             DomainError::NotFound("chat not found or not a participant".to_string())
@@ -936,7 +912,7 @@ impl ChatRepository for PostgresChatRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
         } else {
             let is_owner = sqlx::query_scalar::<_, bool>(
                 r#"
@@ -949,7 +925,7 @@ impl ChatRepository for PostgresChatRepository {
             .bind(user_id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
             if is_owner.unwrap_or(false) {
                 sqlx::query(
@@ -960,7 +936,7 @@ impl ChatRepository for PostgresChatRepository {
                 .bind(chat_id)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(DomainError::from_sqlx)?;
             } else {
                 sqlx::query(
                     r#"
@@ -972,7 +948,7 @@ impl ChatRepository for PostgresChatRepository {
                 .bind(user_id)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(DomainError::from_sqlx)?;
             }
         }
 
@@ -999,7 +975,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?
+        .map_err(DomainError::from_sqlx)?
         .ok_or_else(|| DomainError::NotFound("message not found or not authorized".to_string()))?;
 
         ensure_active_membership_pool(&self.pool, user_id, chat_id).await?;
@@ -1043,7 +1019,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(content_iv)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(map_message_row(updated))
     }
@@ -1065,7 +1041,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(
@@ -1087,7 +1063,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(participants.into_iter().map(|(id,)| id).collect())
     }
@@ -1132,7 +1108,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(page_size)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         rows.into_iter()
             .map(
@@ -1184,7 +1160,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(notification.data)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let nt = NotificationType::from_db_str(&row.2)
             .ok_or_else(|| DomainError::Internal("invalid notification type".to_string()))?;
@@ -1216,7 +1192,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(
@@ -1241,7 +1217,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(count)
     }
@@ -1260,7 +1236,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(count)
     }
@@ -1281,7 +1257,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(row.map(
             |(is_muted, muted_until, is_pinned, pin_order, is_archived)| ChatSettings {
@@ -1322,7 +1298,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(settings.is_archived)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         self.get_chat_settings(user_id, chat_id)
             .await?
@@ -1349,7 +1325,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         Ok(row.and_then(|s| ParticipantRole::from_db_str(&s)))
     }
@@ -1383,7 +1359,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         rows.into_iter()
             .map(
@@ -1430,7 +1406,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(chat_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?
+        .map_err(DomainError::from_sqlx)?
         .ok_or_else(|| DomainError::NotFound("chat not found".to_string()))?;
 
         if chat_type == "private" {
@@ -1447,7 +1423,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if already_member.is_some() {
             return Err(DomainError::Validation(
@@ -1473,7 +1449,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(actor_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let role = ParticipantRole::from_db_str(&row.2)
             .ok_or_else(|| DomainError::Internal("invalid role".to_string()))?;
@@ -1526,7 +1502,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(target_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         // Key rotation is always required when a member leaves
         Ok(true)
@@ -1579,7 +1555,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(new_role.as_db_str())
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let role = ParticipantRole::from_db_str(&row.2)
             .ok_or_else(|| DomainError::Internal("invalid role returned".to_string()))?;
@@ -1628,7 +1604,7 @@ impl ChatRepository for PostgresChatRepository {
             .bind(&new_slug)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
         Ok(new_slug)
     }
@@ -1655,7 +1631,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(slug)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         row.map(
             |(id, chat_type, name, description, avatar_url, created_by, created_at)| {
@@ -1689,7 +1665,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         if already_member.is_some() {
             return Err(DomainError::Validation(
@@ -1720,7 +1696,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(user_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         let role = ParticipantRole::from_db_str(&row.2)
             .ok_or_else(|| DomainError::Internal("invalid role".to_string()))?;
@@ -1751,11 +1727,7 @@ impl ChatRepository for PostgresChatRepository {
             ));
         }
 
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         let mut updated = 0usize;
         for (member_id, new_key) in &keys {
@@ -1771,14 +1743,12 @@ impl ChatRepository for PostgresChatRepository {
             .bind(new_key)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(DomainError::from_sqlx)?;
 
             updated += result.rows_affected() as usize;
         }
 
-        tx.commit()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         Ok(updated)
     }
@@ -1811,11 +1781,7 @@ impl ChatRepository for PostgresChatRepository {
 
         let _ = new_role; // any role is fine — we'll promote them
 
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(DomainError::from_sqlx)?;
 
         // Demote current owner to admin
         sqlx::query(
@@ -1825,7 +1791,7 @@ impl ChatRepository for PostgresChatRepository {
         .bind(current_owner_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
         // Promote new owner
         sqlx::query(
@@ -1835,11 +1801,9 @@ impl ChatRepository for PostgresChatRepository {
         .bind(new_owner_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(DomainError::from_sqlx)?;
 
-        tx.commit()
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        tx.commit().await.map_err(DomainError::from_sqlx)?;
 
         Ok(())
     }
@@ -1865,7 +1829,7 @@ async fn ensure_active_membership(
     .bind(user_id)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|e| DomainError::Internal(e.to_string()))?;
+    .map_err(DomainError::from_sqlx)?;
 
     chat_type
         .ok_or_else(|| DomainError::NotFound("chat not found or not a participant".to_string()))
@@ -1892,7 +1856,7 @@ async fn ensure_active_membership_pool(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DomainError::Internal(e.to_string()))?;
+    .map_err(DomainError::from_sqlx)?;
 
     if exists.is_none() {
         return Err(DomainError::NotFound(
@@ -1924,7 +1888,7 @@ async fn ensure_not_blocked_in_private_chat(
     .bind(chat_id)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|e| DomainError::Internal(e.to_string()))?;
+    .map_err(DomainError::from_sqlx)?;
 
     if blocked.is_some() {
         return Err(DomainError::Unauthorized(
