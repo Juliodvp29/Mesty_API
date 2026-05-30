@@ -4,6 +4,8 @@ use domain::user::repository::UserRepository;
 use domain::user::value_objects::{PhoneNumber, Username};
 use sqlx::PgPool;
 
+const TEST_SECRET: &[u8] = b"test_phone_hash_secret";
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn test_create_user(pool: PgPool) -> sqlx::Result<()> {
     let repo = PostgresUserRepository::new(pool.clone(), None);
@@ -13,6 +15,7 @@ async fn test_create_user(pool: PgPool) -> sqlx::Result<()> {
         Some(Username::new("testuser_create".to_string()).unwrap()),
         phone.clone(),
         Some(domain::user::value_objects::Email::new("test@example.com".to_string()).unwrap()),
+        TEST_SECRET,
     );
 
     repo.create(&user).await.expect("Should create user");
@@ -34,6 +37,7 @@ async fn test_find_by_phone(pool: PgPool) -> sqlx::Result<()> {
         Some(Username::new("testuser_phone".to_string()).unwrap()),
         phone.clone(),
         None,
+        TEST_SECRET,
     );
 
     repo.create(&user).await.expect("Should create user");
@@ -57,6 +61,7 @@ async fn test_update_user(pool: PgPool) -> sqlx::Result<()> {
         Some(Username::new("testuser_update".to_string()).unwrap()),
         phone.clone(),
         None,
+        TEST_SECRET,
     );
 
     repo.create(&user).await.expect("Should create user");
@@ -88,6 +93,7 @@ async fn test_delete_soft_user(pool: PgPool) -> sqlx::Result<()> {
         Some(Username::new("testuser_delete".to_string()).unwrap()),
         phone.clone(),
         None,
+        TEST_SECRET,
     );
 
     repo.create(&user).await.expect("Should create user");
