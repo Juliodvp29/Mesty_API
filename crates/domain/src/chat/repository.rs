@@ -277,4 +277,12 @@ pub trait ChatRepository: Send + Sync {
         current_owner_id: Uuid,
         new_owner_id: Uuid,
     ) -> DomainResult<()>;
+
+    /// Lists recent messages across all of a user's active chats since a specific timestamp.
+    async fn list_messages_since(
+        &self,
+        user_id: Uuid,
+        since: DateTime<Utc>,
+        limit: i64,
+    ) -> DomainResult<Vec<ChatMessage>>;
 }

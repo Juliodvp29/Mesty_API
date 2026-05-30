@@ -1807,6 +1807,53 @@ impl ChatRepository for PostgresChatRepository {
 
         Ok(())
     }
+
+    async fn list_messages_since(
+        &self,
+        user_id: Uuid,
+        since: DateTime<Utc>,
+        limit: i64,
+    ) -> DomainResult<Vec<ChatMessage>> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                Uuid,
+                Uuid,
+                Option<Uuid>,
+                Option<Uuid>,
+                Option<String>,
+                Option<String>,
+                String,
+                Option<serde_json::Value>,
+                bool,
+                DateTime<Utc>,
+                Option<DateTime<Utc>>,
+                Option<DateTime<Utc>>,
+            ),
+        >(
+            r#"
+            SELECT m.id, m.chat_id, m.sender_id, m.reply_to_id,
+                   m.content_encrypted, m.content_iv, m.message_type::text,
+                   m.metadata, m.is_forwarded, m.created_at, m.edited_at, m.deleted_at
+            FROM messages m
+            JOIN chat_participants cp ON cp.chat_id = m.chat_id
+            WHERE cp.user_id = $1
+              AND cp.left_at IS NULL
+              AND m.created_at > $2
+              AND m.deleted_at IS NULL
+            ORDER BY m.created_at ASC
+            LIMIT $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(since)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(DomainError::from_sqlx)?;
+
+        Ok(rows.into_iter().map(map_message_row).collect())
+    }
 }
 
 async fn ensure_active_membership(

@@ -639,34 +639,25 @@ async fn sync_messages_after(
     user_id: Uuid,
     since: DateTime<Utc>,
 ) -> Result<Vec<serde_json::Value>, ()> {
-    use domain::chat::repository::{ChatRepository, MessageDirection};
+    use domain::chat::repository::ChatRepository;
 
-    let chat_previews = chat_repo
-        .list_chats_for_user(user_id, None, 50)
+    let messages = chat_repo
+        .list_messages_since(user_id, since, 100)
         .await
         .map_err(|_| ())?;
 
     let mut all_messages = Vec::new();
 
-    for preview in chat_previews {
-        let messages = chat_repo
-            .list_messages(user_id, preview.chat_id, None, MessageDirection::Before, 50)
-            .await
-            .map_err(|_| ())?;
-
-        for msg in messages {
-            if msg.created_at > since {
-                all_messages.push(serde_json::json!({
-                    "chat_id": msg.chat_id,
-                    "message_id": msg.id,
-                    "sender_id": msg.sender_id,
-                    "content_encrypted": msg.content_encrypted,
-                    "content_iv": msg.content_iv,
-                    "message_type": msg.message_type,
-                    "created_at": msg.created_at,
-                }));
-            }
-        }
+    for msg in messages {
+        all_messages.push(serde_json::json!({
+            "chat_id": msg.chat_id,
+            "message_id": msg.id,
+            "sender_id": msg.sender_id,
+            "content_encrypted": msg.content_encrypted,
+            "content_iv": msg.content_iv,
+            "message_type": msg.message_type,
+            "created_at": msg.created_at,
+        }));
     }
 
     Ok(all_messages)
