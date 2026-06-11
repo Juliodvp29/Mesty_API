@@ -1631,7 +1631,7 @@ DELETE /contacts/:contact_id
 
 ### 12.5 Sync Contacts 🔒
 
-Privacy-preserving contact discovery. The client sends SHA-256 hashes of E.164 phone numbers; the server returns matches without exposing the plaintext numbers.
+Privacy-preserving contact discovery. The client sends E.164 phone numbers in plaintext; the server computes the secure server-salted HMAC-SHA256 hashes internally to match users. The server returns matched users alongside the plaintext's flat SHA-256 hash (without server salt) so the client can map the response back to its local address book without knowing the server's private secret.
 
 ```
 POST /contacts/sync
@@ -1641,11 +1641,11 @@ POST /contacts/sync
 
 ```json
 {
-  "hashes": ["a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3", "..."]
+  "phones": ["+15559876543", "..."]
 }
 ```
 
-Constraints: 1–1000 hashes per request.
+Constraints: 1–1000 phone numbers per request.
 
 **Response `200 OK`:**
 
@@ -1653,7 +1653,7 @@ Constraints: 1–1000 hashes per request.
 {
   "matches": [
     {
-      "hash": "a665a459...",
+      "hash": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
       "user_id": "uuid",
       "username": "alice",
       "display_name": "Alice"
@@ -1662,7 +1662,7 @@ Constraints: 1–1000 hashes per request.
 }
 ```
 
-Non-matching hashes are simply omitted from the response.
+Non-matching contacts are simply omitted from the response.
 
 ---
 
@@ -1728,23 +1728,45 @@ GET /blocks
 
 ## 14. WebSocket (Real-time)
 
-### 14.1 Connect
+To avoid JWT token exposure in server logs, reverse proxies, and browser history, Mesty implements a **One-Time Ticket** authentication flow for WebSockets. The client must first request a ticket via HTTP, and then connect using that ticket.
+
+### 14.1 Request One-Time Ticket 🔒
+
+Generates a short-lived (30 seconds), single-use ticket to establish a WebSocket connection.
 
 ```
-GET /ws?token=<access_token>
+POST /ws/ticket
 ```
 
-Upgrade to WebSocket using a valid **access token** as a query parameter (not in a header, due to WebSocket browser limitations).
+No request body needed.
 
-```
-wss://your-domain/ws?token=<access_token>
-```
+**Response `201 Created`:**
 
-On successful connection, the server confirms presence to other participants and delivers any queued events.
+```json
+{
+  "ticket": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+}
+```
 
 ---
 
-### 14.2 Client → Server Messages
+### 14.2 Connect
+
+```
+GET /ws?ticket=<one_time_ticket>
+```
+
+Upgrade to WebSocket using the valid **one-time ticket** as a query parameter (not in a header, due to WebSocket browser limitations).
+
+```
+wss://your-domain/ws?ticket=<one_time_ticket>
+```
+
+Upon successful connection, the ticket is immediately consumed and validated. The server confirms presence to other participants and delivers any queued events.
+
+---
+
+### 14.3 Client → Server Messages
 
 All messages are JSON with `type` and `payload` fields:
 
@@ -1781,7 +1803,7 @@ Requests missed events since a given timestamp (useful after reconnect).
 
 ---
 
-### 14.3 Server → Client Events
+### 14.4 Server → Client Events
 
 The server pushes JSON events with the same `type` / `payload` envelope.
 
